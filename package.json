@@ -1,0 +1,35 @@
+{
+  "name": "base-gas-mcp",
+  "version": "1.0.0",
+  "description": "Single-tool MCP server that pays $0.001 USDC per call via x402 to fetch live Base mainnet gas data.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "x402",
+    "base",
+    "ethereum",
+    "usdc",
+    "gas",
+    "agent-payments"
+  ],
+  "author": "memosr",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/memosr/base-gas-mcp.git"
+  },
+  "homepage": "https://github.com/memosr/base-gas-mcp",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@x402/evm": "^2.16.0",
+    "@x402/fetch": "^2.16.0",
+    "dotenv": "^17.4.2",
+    "viem": "^2.53.1",
+    "zod": "^4.4.3"
+  }
+}
