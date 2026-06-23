@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { wrapFetchWithPayment, x402Client } from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm";
+import { BuilderCodeClientExtension } from "@x402/extensions/builder-code";
 import { privateKeyToAccount } from "viem/accounts";
 
 // --- Constants ---------------------------------------------------------------
@@ -12,6 +13,10 @@ const DEFAULT_TARGET_URL = "https://base-gas-x402-production.up.railway.app/gas"
 // Base mainnet, CAIP-2 network id used by the x402 client registry.
 const NETWORK = "eip155:8453";
 const PAYMENT_AMOUNT = "$0.001 USDC";
+// Base Builder Code attached to the payment payload for attribution. Registering
+// the builder-code client extension also lets x402 echo the server's app code
+// back in the payload, so the facilitator's app-code match check passes.
+const BUILDER_CODE_VALUE = process.env.BUILDER_CODE || "bc_lhfd8zad";
 
 // --- Helpers -----------------------------------------------------------------
 
@@ -49,6 +54,9 @@ function createPayingFetch(privateKey) {
     NETWORK,
     new ExactEvmScheme(account),
   );
+  // Attach builder-code attribution to the payment payload (same code the
+  // server advertises). Leaves the existing payment flow otherwise untouched.
+  client.registerExtension(new BuilderCodeClientExtension(BUILDER_CODE_VALUE));
   return { account, fetchWithPay: wrapFetchWithPayment(fetch, client) };
 }
 

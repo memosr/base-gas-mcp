@@ -27,6 +27,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@x402/evm": "^2.16.0",
+    "@x402/extensions": "^2.16.0",
     "@x402/fetch": "^2.16.0",
     "dotenv": "^17.4.2",
     "viem": "^2.53.1",
