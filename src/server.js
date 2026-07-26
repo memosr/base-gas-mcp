@@ -3,7 +3,11 @@ import "dotenv/config";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { wrapFetchWithPayment, x402Client } from "@x402/fetch";
+import {
+  wrapFetchWithPayment,
+  x402Client,
+  decodePaymentResponseHeader,
+} from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm";
 import { BuilderCodeClientExtension } from "@x402/extensions/builder-code";
 import { privateKeyToAccount } from "viem/accounts";
@@ -13,7 +17,9 @@ import { privateKeyToAccount } from "viem/accounts";
 const DEFAULT_TARGET_URL = "https://base-gas-x402-production.up.railway.app/gas";
 // Base mainnet, CAIP-2 network id used by the x402 client registry.
 const NETWORK = "eip155:8453";
-const PAYMENT_AMOUNT = "$0.001 USDC";
+// USDC uses 6 decimals, so the atomic amount in the settlement receipt is
+// divided by 1e6 to get USD.
+const USDC_DECIMALS = 6;
 // Base Builder Code attached to the payment payload for attribution. Registering
 // the builder-code client extension also lets x402 echo the server's app code
 // back in the payload, so the facilitator's app-code match check passes.
@@ -74,13 +80,41 @@ function pick(obj, keys) {
 }
 
 /**
+ * Reads what was actually paid out of the x402 settlement receipt.
+ *
+ * The price is deliberately NOT hardcoded here. It lives on the server and can
+ * change at any time; a constant in this file would silently start lying the
+ * moment it does. Reporting the settled amount keeps this accurate forever.
+ *
+ * @param {Response} response
+ * @returns {string} A human-readable amount, or a safe fallback.
+ */
+function readSettledAmount(response) {
+  const header = response.headers.get("x-payment-response");
+  if (!header) return "amount not reported by the server";
+
+  try {
+    const settlement = decodePaymentResponseHeader(header);
+    if (settlement.amount === undefined || settlement.amount === null) {
+      return "amount not reported by the server";
+    }
+    const usd = Number(settlement.amount) / 10 ** USDC_DECIMALS;
+    const tx = settlement.transaction ? ` (tx ${settlement.transaction})` : "";
+    return `$${usd} USDC${tx}`;
+  } catch {
+    return "amount could not be decoded";
+  }
+}
+
+/**
  * Formats the gas API JSON into a readable tool result. Unknown shapes fall
  * back to pretty-printed JSON so the caller still gets the live data.
  * @param {any} data
  * @param {string} url
  * @param {string} payerAddress
+ * @param {string} paidAmount
  */
-function formatGas(data, url, payerAddress) {
+function formatGas(data, url, payerAddress, paidAmount) {
   const lines = [
     "Live Base mainnet gas (paid via x402)",
     "=".repeat(40),
@@ -124,7 +158,7 @@ function formatGas(data, url, payerAddress) {
   lines.push("-".repeat(40));
   lines.push(`Source:  ${url}`);
   lines.push(`Payer:   ${payerAddress}`);
-  lines.push(`Paid:    ${PAYMENT_AMOUNT} on Base mainnet (${NETWORK})`);
+  lines.push(`Paid:    ${paidAmount} on Base mainnet (${NETWORK})`);
   return lines.join("\n");
 }
 
@@ -167,7 +201,10 @@ async function getBaseGas(args) {
     }
 
     const data = await res.json();
-    return { content: [{ type: "text", text: formatGas(data, url, payer) }] };
+    const paidAmount = readSettledAmount(res);
+    return {
+      content: [{ type: "text", text: formatGas(data, url, payer, paidAmount) }],
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // Common failure modes surfaced clearly; never echo the private key.
@@ -199,8 +236,10 @@ server.registerTool(
     description:
       "Returns live Base mainnet gas data (base fee, low/medium/high priority fees, " +
       "and an ETH transfer cost estimate). IMPORTANT: every call makes a REAL " +
-      `${PAYMENT_AMOUNT} payment on Base mainnet via the x402 protocol and requires a ` +
+      "micropayment in USDC on Base mainnet via the x402 protocol and requires a " +
       "funded buyer wallet (BUYER_PRIVATE_KEY) holding USDC and ETH for gas. " +
+      "The exact price is set by the endpoint and published in its OpenAPI " +
+      "document; the amount actually settled is reported in the result. " +
       "Do not call this repeatedly or in loops — each invocation spends real money.",
     inputSchema: {
       target_url: z

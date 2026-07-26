@@ -1,7 +1,7 @@
 {
   "name": "base-gas-mcp",
-  "version": "0.1.1",
-  "description": "Single-tool MCP server that pays $0.001 USDC per call via x402 to fetch live Base mainnet gas data.",
+  "version": "0.2.0",
+  "description": "Single-tool MCP server that pays per call in USDC via x402 to fetch live Base mainnet gas data.",
   "main": "src/server.js",
   "bin": {
     "base-gas-mcp": "src/server.js"

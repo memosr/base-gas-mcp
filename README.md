@@ -1,12 +1,14 @@
 # base-gas-mcp
 
-An MCP server that fetches live Base mainnet gas data by paying $0.001 USDC per call over the [x402](https://www.x402.org) payment protocol.
+An MCP server that fetches live Base mainnet gas data by paying per call in USDC over the [x402](https://www.x402.org) payment protocol.
+
+The price is set by the endpoint, not by this package, and is published in the endpoint's OpenAPI document at [`/openapi.json`](https://base-gas-x402-production.up.railway.app/openapi.json). Every tool result reports the amount that was actually settled on-chain.
 
 ## Tools
 
 ### `get_base_gas`
 
-Fetches live Base mainnet gas data from a paid x402 API. Each call makes a real $0.001 USDC payment on Base mainnet (`eip155:8453`), signed as an EIP-3009 transfer authorization by the wallet in `BUYER_PRIVATE_KEY`. Do not call it in loops or on a schedule: every invocation spends real funds.
+Fetches live Base mainnet gas data from a paid x402 API. Each call makes a real USDC payment on Base mainnet (`eip155:8453`), signed as an EIP-3009 transfer authorization by the wallet in `BUYER_PRIVATE_KEY`. Do not call it in loops or on a schedule: every invocation spends real funds.
 
 **Parameters**
 
@@ -124,7 +126,7 @@ Once configured, ask Claude:
 - "How much would a simple ETH transfer cost on Base right now?"
 - "Check Base gas and tell me whether the base fee is high or low at the moment."
 
-Each of these triggers one `get_base_gas` call and spends $0.001 USDC.
+Each of these triggers one `get_base_gas` call and spends real USDC.
 
 ## Tech stack
 
