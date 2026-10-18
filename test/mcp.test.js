@@ -15,7 +15,9 @@ async function connect(env) {
     new StdioClientTransport({
       command: process.execPath,
       args: ["src/server.js"],
-      env: { PATH: process.env.PATH, BASE_GAS_ORIGIN: api.origin, ...env },
+      // DOTENV_CONFIG_PATH points nowhere so a developer's real .env (and
+      // wallet key) never leaks into the tests.
+      env: { PATH: process.env.PATH, DOTENV_CONFIG_PATH: "/nonexistent/.env", BASE_GAS_ORIGIN: api.origin, ...env },
       stderr: "ignore",
     }),
   );
@@ -74,7 +76,7 @@ test("rejects out-of-range arguments", async () => {
 });
 
 test("get_service_status works without a wallet", async () => {
-  const c = await connect({});
+  const c = await connect({ BUYER_PRIVATE_KEY: "" });
   try {
     const r = await c.callTool({ name: "get_service_status", arguments: {} });
     assert.ok(!r.isError, text(r));
