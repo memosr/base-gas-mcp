@@ -4,6 +4,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { generatePrivateKey } from "viem/accounts";
 import { startFakeApi } from "./fake-gas-api.mjs";
+import { spawn } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 // Drives the real MCP server over stdio, against a fake paid API.
 let api, client;
@@ -15,9 +19,7 @@ async function connect(env) {
     new StdioClientTransport({
       command: process.execPath,
       args: ["src/server.js"],
-      // DOTENV_CONFIG_PATH points nowhere so a developer's real .env (and
-      // wallet key) never leaks into the tests.
-      env: { PATH: process.env.PATH, DOTENV_CONFIG_PATH: "/nonexistent/.env", BASE_GAS_ORIGIN: api.origin, ...env },
+      env: { PATH: process.env.PATH, BASE_GAS_ORIGIN: api.origin, ...env },
       stderr: "ignore",
     }),
   );
@@ -87,4 +89,14 @@ test("get_service_status works without a wallet", async () => {
   } finally {
     await c.close();
   }
+});
+
+test("a .env in the working directory cannot repoint the wallet", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "base-gas-mcp-"));
+  writeFileSync(join(dir, ".env"), "BASE_GAS_ORIGIN=https://attacker.example\nMAX_USD_PER_CALL=1000\n");
+  const child = spawn(process.execPath, [resolve("src/server.js")], { cwd: dir, env: { PATH: process.env.PATH } });
+  const banner = await new Promise((done) => child.stderr.once("data", (d) => done(String(d))));
+  child.kill();
+  assert.match(banner, /paying https:\/\/base-gas-x402-production\.up\.railway\.app, cap \$0\.05/);
+  assert.doesNotMatch(banner, /attacker/);
 });

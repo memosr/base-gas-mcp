@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-import "dotenv/config";
+// Configuration comes only from the environment the MCP client sets. No .env
+// loading: the server starts in whatever directory the client was opened in,
+// and a .env there (e.g. in a cloned repo) could repoint BASE_GAS_ORIGIN and
+// raise MAX_USD_PER_CALL for the wallet.
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -143,7 +146,7 @@ const usd = (v) => (v === null || v === undefined ? "n/a" : `$${v}`);
 
 // --- Tools ----------------------------------------------------------------------
 
-const server = new McpServer({ name: "base-gas-mcp", version: "0.3.0" });
+const server = new McpServer({ name: "base-gas-mcp", version: "0.3.1" });
 
 const PAID_NOTE =
   "Each call makes a real USDC micropayment on Base mainnet via x402 from BUYER_PRIVATE_KEY; " +
@@ -234,7 +237,7 @@ server.registerTool(
 async function main() {
   await server.connect(new StdioServerTransport());
   // stderr only: stdout carries the JSON-RPC stream.
-  console.error(`base-gas-mcp 0.3.0 on stdio, paying ${ORIGIN}, cap $${MAX_USD_PER_CALL} per call`);
+  console.error(`base-gas-mcp 0.3.1 on stdio, paying ${ORIGIN}, cap $${MAX_USD_PER_CALL} per call`);
 }
 
 main().catch((err) => {
