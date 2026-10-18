@@ -52,9 +52,9 @@ The paid data source is a companion project:
 git clone https://github.com/memosr/base-gas-mcp.git
 cd base-gas-mcp
 npm install
-cp .env.example .env
-# edit .env and set BUYER_PRIVATE_KEY
 ```
+
+Pass `BUYER_PRIVATE_KEY` through your MCP client's config (see below). The server does not read a `.env` file.
 
 Or run the published package directly with `npx base-gas-mcp` (see the config blocks below).
 
@@ -63,7 +63,7 @@ Or run the published package directly with `npx base-gas-mcp` (see the config bl
 `BUYER_PRIVATE_KEY` is the private key of a Base mainnet wallet. Create a fresh wallet (for example in MetaMask, Coinbase Wallet, or with `cast wallet new`), export its private key, and fund it on Base with a few dollars of USDC.
 
 > **Warning:** this is a real private key that controls real funds.
-> Use a separate, disposable wallet holding only small amounts. Never reuse a key from a wallet with significant funds, never commit it to git (`.env` is gitignored), and never paste it into chat. The server reads it only to sign payments and never logs or returns it.
+> Use a separate, disposable wallet holding only small amounts. Never reuse a key from a wallet with significant funds, never commit it to git, and never paste it into chat. The server reads it only to sign payments and never logs or returns it.
 
 ### Environment variables
 
@@ -121,10 +121,12 @@ claude mcp add base-gas \
 Or from a local clone:
 
 ```bash
-claude mcp add base-gas -- node /absolute/path/to/base-gas-mcp/src/server.js
+claude mcp add base-gas \
+  --env BUYER_PRIVATE_KEY=0xYOUR_FUNDED_BASE_MAINNET_PRIVATE_KEY \
+  -- node /absolute/path/to/base-gas-mcp/src/server.js
 ```
 
-With the local form, put `BUYER_PRIVATE_KEY` in the project's `.env` file instead of the command line.
+The server reads its settings only from the environment the client passes. It does not load a `.env` file (since 0.3.1), so a `.env` in whatever folder the client opens cannot change where the wallet pays.
 
 ## Example usage
 
