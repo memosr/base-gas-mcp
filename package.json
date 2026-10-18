@@ -1,6 +1,6 @@
 {
   "name": "base-gas-mcp",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "mcpName": "io.github.memosr/base-gas-mcp",
   "description": "MCP server for live Base gas, transaction costs in USD, cross-chain comparison and gas history, paid per call in USDC via x402.",
   "main": "src/server.js",

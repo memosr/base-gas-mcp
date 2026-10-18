@@ -10,6 +10,7 @@ const BODIES = {
     baseFeePerGas: "0.005",
     priorityFeePerGas: { low: "0.0004", medium: "0.001", high: "0.007" },
     estimatedTransferCost: { gasLimit: 21000, gwei: "126", eth: "0.000000126", usd: "0.0003007" },
+    suggestedFees: { unit: "wei", medium: { maxFeePerGas: "11000000", maxPriorityFeePerGas: "1000000" } },
   },
   "/gas/compare": {
     gasLimit: 21000,

@@ -55,6 +55,7 @@ test("get_base_gas pays, passes gasLimit, and reports USD and the tx", async () 
   assert.ok(!r.isError, text(r));
   assert.match(text(r), /\$0\.0003007/);
   assert.match(text(r), /tx 0xabc123/);
+  assert.match(text(r), /maxFeePerGas 11000000 wei, maxPriorityFeePerGas 1000000 wei/);
   assert.ok(api.seen.some((s) => s.path === "/gas" && s.query === "?gasLimit=180000" && s.paid));
 });
 
