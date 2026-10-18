@@ -1,45 +1,52 @@
 # base-gas-mcp
 
-An MCP server that fetches live Base mainnet gas data by paying per call in USDC over the [x402](https://www.x402.org) payment protocol.
+<!-- mcp-name: io.github.memosr/base-gas-mcp -->
 
-The price is set by the endpoint, not by this package, and is published in the endpoint's OpenAPI document at [`/openapi.json`](https://base-gas-x402-production.up.railway.app/openapi.json). Every tool result reports the amount that was actually settled on-chain.
+An MCP server for live Base gas data, paid per call in USDC over the
+[x402](https://www.x402.org) payment protocol. No API key and no account: the
+agent pays a fraction of a cent from a wallet you control.
+
+It answers the questions an RPC call cannot: what a transaction costs **in
+dollars**, which chain is cheapest right now, whether gas is high or low, and
+which hours to avoid.
 
 ## Tools
 
-### `get_base_gas`
+| Tool | Price | What it returns |
+|------|-------|-----------------|
+| `get_base_gas` | ~$0.002 | Base fee, low/medium/high priority fees, and the cost of a transaction in USD, ETH and gwei. Optional `gasLimit`. |
+| `compare_gas_costs` | ~$0.01 | The same transaction on Base, OP Mainnet, Arbitrum One and Ethereum, in USD, cheapest first. Optional `gasLimit`. |
+| `get_gas_history` | ~$0.01 | Base gas over the last `hours` (default 24): min/max/average/median and whether gas is cheap, normal, expensive or flat now. |
+| `get_cheapest_window` | ~$0.02 | From 7 days of history: hours to avoid, cheapest hour (UTC), and the saving in percent and USD. |
+| `get_service_status` | free | Whether the service is up and how much history it has collected. Needs no wallet. |
 
-Fetches live Base mainnet gas data from a paid x402 API. Each call makes a real USDC payment on Base mainnet (`eip155:8453`), signed as an EIP-3009 transfer authorization by the wallet in `BUYER_PRIVATE_KEY`. Do not call it in loops or on a schedule: every invocation spends real funds.
+Prices are set by the endpoint and published in its
+[OpenAPI document](https://base-gas-x402-production.up.railway.app/openapi.json).
+Every paid result includes the settlement transaction hash.
 
-**Parameters**
+`gasLimit` guide: 21000 ETH transfer (default), ~65000 ERC-20 transfer, ~85000
+NFT mint, ~180000 Uniswap swap, ~1500000 contract deploy.
 
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `target_url` | string (URL) | No | Override the x402 gas API URL. Defaults to `https://base-gas-x402-production.up.railway.app/gas`. |
+## Safety
 
-**Returns** a formatted text report with:
+- **The server only ever pays one origin**, set by you (`BASE_GAS_ORIGIN`,
+  defaulting to the live base-gas-x402 API). No tool takes a URL, so text the
+  model reads cannot redirect your wallet to another paid endpoint.
+- **Per-payment cap.** Any payment above `MAX_USD_PER_CALL` (default `0.05`) is
+  refused before anything is signed.
+- Payments are EIP-3009 authorizations: the wallet needs **USDC only, no ETH**.
+- Use a separate wallet holding a few dollars. The key is read from the
+  environment to sign payments and is never logged or returned.
 
-- Base fee
-- Priority fees (low, medium, high)
-- Estimated ETH transfer cost
-- Source URL, payer address, and the amount paid
-
-Example call from an MCP client:
-
-```json
-{
-  "name": "get_base_gas",
-  "arguments": {}
-}
-```
-
-The paid data source is a companion project: [base-gas-x402](https://github.com/memosr/base-gas-x402).
+The paid data source is a companion project:
+[base-gas-x402](https://github.com/memosr/base-gas-x402).
 
 ## Installation
 
 **Requirements**
 
 - Node.js 18 or newer (built-in `fetch` is required)
-- A funded Base mainnet wallet: a small USDC balance to pay per call, plus a little ETH for gas
+- A Base mainnet wallet holding a little USDC (no ETH needed)
 
 ```bash
 git clone https://github.com/memosr/base-gas-mcp.git
@@ -53,7 +60,7 @@ Or run the published package directly with `npx base-gas-mcp` (see the config bl
 
 ### Getting a buyer key
 
-`BUYER_PRIVATE_KEY` is the private key of a Base mainnet wallet. Create a fresh wallet (for example in MetaMask, Coinbase Wallet, or with `cast wallet new`), export its private key, and fund it on Base with a few dollars of USDC and a small amount of ETH.
+`BUYER_PRIVATE_KEY` is the private key of a Base mainnet wallet. Create a fresh wallet (for example in MetaMask, Coinbase Wallet, or with `cast wallet new`), export its private key, and fund it on Base with a few dollars of USDC.
 
 > **Warning:** this is a real private key that controls real funds.
 > Use a separate, disposable wallet holding only small amounts. Never reuse a key from a wallet with significant funds, never commit it to git (`.env` is gitignored), and never paste it into chat. The server reads it only to sign payments and never logs or returns it.
@@ -63,7 +70,8 @@ Or run the published package directly with `npx base-gas-mcp` (see the config bl
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `BUYER_PRIVATE_KEY` | Yes | 32-byte hex private key (64 hex chars, `0x` prefix optional) of a funded Base mainnet wallet. |
-| `TARGET_URL` | No | Override the gas API URL. |
+| `MAX_USD_PER_CALL` | No | Refuse any single payment above this many USD. Default `0.05`. |
+| `BASE_GAS_ORIGIN` | No | The only origin the server pays. Defaults to `https://base-gas-x402-production.up.railway.app`. |
 | `BUILDER_CODE` | No | Base Builder Code attached to the payment payload for attribution. Defaults to `bc_lhfd8zad`. |
 
 ## Configuration
@@ -120,13 +128,14 @@ With the local form, put `BUYER_PRIVATE_KEY` in the project's `.env` file instea
 
 ## Example usage
 
-Once configured, ask Claude:
+Once configured, ask your agent:
 
-- "What is the current gas price on Base?"
-- "How much would a simple ETH transfer cost on Base right now?"
-- "Check Base gas and tell me whether the base fee is high or low at the moment."
+- "What does a Uniswap swap on Base cost right now, in dollars?" (`get_base_gas` with `gasLimit` 180000)
+- "Is Base or Arbitrum cheaper for a token transfer at the moment?" (`compare_gas_costs`)
+- "Is Base gas high right now, or should I wait?" (`get_gas_history`)
+- "When should I schedule a batch of transactions on Base?" (`get_cheapest_window`)
 
-Each of these triggers one `get_base_gas` call and spends real USDC.
+Each of these is one paid call. Check `get_service_status` first for free.
 
 ## Tech stack
 

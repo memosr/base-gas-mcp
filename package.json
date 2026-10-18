@@ -1,7 +1,8 @@
 {
   "name": "base-gas-mcp",
-  "version": "0.2.0",
-  "description": "Single-tool MCP server that pays per call in USDC via x402 to fetch live Base mainnet gas data.",
+  "version": "0.3.0",
+  "mcpName": "io.github.memosr/base-gas-mcp",
+  "description": "MCP server for live Base gas, transaction costs in USD, cross-chain comparison and gas history, paid per call in USDC via x402.",
   "main": "src/server.js",
   "bin": {
     "base-gas-mcp": "src/server.js"
@@ -9,10 +10,12 @@
   "files": [
     "src/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "server.json"
   ],
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "mcp",
@@ -22,7 +25,10 @@
     "ethereum",
     "usdc",
     "gas",
-    "agent-payments"
+    "agent-payments",
+    "base-mainnet",
+    "gas-oracle",
+    "mcp-server"
   ],
   "author": "memosr",
   "license": "MIT",
@@ -37,11 +43,15 @@
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@x402/evm": "^2.16.0",
-    "@x402/extensions": "^2.16.0",
-    "@x402/fetch": "^2.16.0",
+    "@x402/core": "^2.28.0",
+    "@x402/evm": "^2.28.0",
+    "@x402/extensions": "^2.28.0",
+    "@x402/fetch": "^2.28.0",
     "dotenv": "^17.4.2",
     "viem": "^2.53.1",
     "zod": "^4.4.3"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
