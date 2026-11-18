@@ -13,13 +13,13 @@ import { join, resolve } from "node:path";
 let api, client;
 const text = (r) => r.content.map((c) => c.text).join("\n");
 
-async function connect(env) {
+async function connect(env, origin = api.origin) {
   const c = new Client({ name: "test", version: "1.0.0" });
   await c.connect(
     new StdioClientTransport({
       command: process.execPath,
       args: ["src/server.js"],
-      env: { PATH: process.env.PATH, BASE_GAS_ORIGIN: api.origin, ...env },
+      env: { PATH: process.env.PATH, BASE_GAS_ORIGIN: origin, ...env },
       stderr: "ignore",
     }),
   );
@@ -29,7 +29,7 @@ async function connect(env) {
 before(async () => {
   api = await startFakeApi({
     // cheapest-window priced above the default $0.05 cap on purpose.
-    prices: { "/gas": "2000", "/gas/compare": "10000", "/gas/history": "10000", "/gas/cheapest-window": "100000" },
+    prices: { "/gas": "2000", "/gas/compare": "10000", "/gas/history": "10000", "/gas/cheapest-window": "100000", "/gas/advice": "3000" },
   });
   client = await connect({ BUYER_PRIVATE_KEY: generatePrivateKey() });
 });
@@ -39,11 +39,11 @@ after(async () => {
   api?.close();
 });
 
-test("lists the five tools, and none of them takes a URL", async () => {
+test("lists the six tools, and none of them takes a URL", async () => {
   const { tools } = await client.listTools();
   assert.deepEqual(
     tools.map((t) => t.name).sort(),
-    ["compare_gas_costs", "get_base_gas", "get_cheapest_window", "get_gas_history", "get_service_status"],
+    ["compare_gas_costs", "get_base_gas", "get_cheapest_window", "get_gas_advice", "get_gas_history", "get_service_status"],
   );
   for (const t of tools) {
     assert.ok(!Object.keys(t.inputSchema.properties ?? {}).some((k) => /url/i.test(k)), t.name);
@@ -57,6 +57,55 @@ test("get_base_gas pays, passes gasLimit, and reports USD and the tx", async () 
   assert.match(text(r), /tx 0xabc123/);
   assert.match(text(r), /maxFeePerGas 11000000 wei, maxPriorityFeePerGas 1000000 wei/);
   assert.ok(api.seen.some((s) => s.path === "/gas" && s.query === "?gasLimit=180000" && s.paid));
+});
+
+// Runs get_gas_advice against a fake API whose /gas/advice answer is `body`.
+async function adviceWith(body) {
+  const fake = await startFakeApi({ bodies: { "/gas/advice": body } });
+  const c = await connect({ BUYER_PRIVATE_KEY: generatePrivateKey() }, fake.origin);
+  try {
+    return await c.callTool({ name: "get_gas_advice", arguments: {} });
+  } finally {
+    await c.close();
+    fake.close();
+  }
+}
+
+const ADVICE = {
+  advice: "send_now",
+  confidence: "high",
+  reason: "Base gas is in the bottom third of its 24h range.",
+  waitMinutes: null,
+  now: { costUsd: "0.0035", gasLimit: 180000, baseFeePerGas: "0.01", priorityFeePerGas: { medium: "0.006038644" } },
+  verdict: "cheap",
+  verdictNote: "",
+  suggestedFees: { maxFeePerGas: "16038644", maxPriorityFeePerGas: "6038644" },
+  fetchedAt: "2026-11-18T12:00:00.000Z",
+};
+
+test("get_gas_advice pays, passes gasLimit, and leads with send_now", async () => {
+  const r = await client.callTool({ name: "get_gas_advice", arguments: { gasLimit: 180000 } });
+  assert.ok(!r.isError, text(r));
+  assert.match(
+    text(r),
+    /^send_now \(high confidence\): Base gas is in the bottom third of its 24h range\. Cost now: \$0\.0035 for 180000 gas\. maxFeePerGas 16038644 wei, maxPriorityFeePerGas 6038644 wei\.$/m,
+  );
+  assert.match(text(r), /tx 0xabc123/);
+  assert.ok(api.seen.some((s) => s.path === "/gas/advice" && s.query === "?gasLimit=180000" && s.paid));
+});
+
+test("get_gas_advice shows waitMinutes and flags low confidence", async () => {
+  const r = await adviceWith({ ...ADVICE, advice: "wait", confidence: "low", reason: "Gas is above its 24h median.", waitMinutes: 40 });
+  assert.ok(!r.isError, text(r));
+  assert.match(text(r), /^wait \(low confidence\): Gas is above its 24h median\. Wait about 40 minutes\./m);
+  assert.match(text(r), /Low confidence: treat this as a hint/);
+});
+
+test("get_gas_advice says so when suggestedFees is null", async () => {
+  const r = await adviceWith({ ...ADVICE, suggestedFees: null });
+  assert.ok(!r.isError, text(r));
+  assert.match(text(r), /Cost now: \$0\.0035 for 180000 gas\. No ready-to-sign fees returned; call get_base_gas/);
+  assert.doesNotMatch(text(r).split("\n")[0], /maxFeePerGas \d/);
 });
 
 test("compare_gas_costs summarizes the ranking", async () => {

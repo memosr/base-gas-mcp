@@ -146,7 +146,7 @@ const usd = (v) => (v === null || v === undefined ? "n/a" : `$${v}`);
 
 // --- Tools ----------------------------------------------------------------------
 
-const server = new McpServer({ name: "base-gas-mcp", version: "0.3.2" });
+const server = new McpServer({ name: "base-gas-mcp", version: "0.4.0" });
 
 const PAID_NOTE =
   "Each call makes a real USDC micropayment on Base mainnet via x402 from BUYER_PRIVATE_KEY; " +
@@ -179,6 +179,33 @@ server.registerTool(
         : "";
       return `Base gas: base fee ${d.baseFeePerGas} gwei, priority low/medium/high ${d.priorityFeePerGas?.low}/${d.priorityFeePerGas?.medium}/${d.priorityFeePerGas?.high} gwei. A ${c.gasLimit}-gas transaction costs about ${usd(c.usd)} (${c.eth} ETH).${fees}`;
     }, { paid: true }),
+);
+
+/** One-line summary of a /gas/advice answer: the decision first, then cost and fees. */
+function summarizeAdvice(d) {
+  const n = d.now ?? {};
+  const f = d.suggestedFees;
+  const parts = [`${d.advice} (${d.confidence} confidence): ${d.reason}`];
+  if (d.advice === "wait" && d.waitMinutes != null) parts.push(`Wait about ${d.waitMinutes} minutes.`);
+  if (d.confidence === "low") parts.push("Low confidence: treat this as a hint, not a rule.");
+  parts.push(`Cost now: ${usd(n.costUsd)} for ${n.gasLimit} gas.`);
+  parts.push(
+    f
+      ? `maxFeePerGas ${f.maxFeePerGas} wei, maxPriorityFeePerGas ${f.maxPriorityFeePerGas} wei.`
+      : "No ready-to-sign fees returned; call get_base_gas for maxFeePerGas / maxPriorityFeePerGas.",
+  );
+  return parts.join(" ");
+}
+
+server.registerTool(
+  "get_gas_advice",
+  {
+    title: "Send now or wait on Base",
+    description: `Should I send my Base transaction now or wait? Returns send_now or wait, the reason, the USD cost now and ready-to-sign EIP-1559 fees. Use before sending any transaction on Base. Costs about $0.003. ${PAID_NOTE}`,
+    inputSchema: { gasLimit },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  async ({ gasLimit: g }) => callRoute(`/gas/advice${g ? `?gasLimit=${g}` : ""}`, summarizeAdvice, { paid: true }),
 );
 
 server.registerTool(
@@ -241,7 +268,7 @@ server.registerTool(
 async function main() {
   await server.connect(new StdioServerTransport());
   // stderr only: stdout carries the JSON-RPC stream.
-  console.error(`base-gas-mcp 0.3.2 on stdio, paying ${ORIGIN}, cap $${MAX_USD_PER_CALL} per call`);
+  console.error(`base-gas-mcp 0.4.0 on stdio, paying ${ORIGIN}, cap $${MAX_USD_PER_CALL} per call`);
 }
 
 main().catch((err) => {

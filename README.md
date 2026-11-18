@@ -15,6 +15,7 @@ which hours to avoid.
 | Tool | Price | What it returns |
 |------|-------|-----------------|
 | `get_base_gas` | ~$0.002 | Base fee, low/medium/high priority fees, the cost of a transaction in USD, ETH and gwei, and ready-to-sign `maxFeePerGas` / `maxPriorityFeePerGas` (wei). Optional `gasLimit`. |
+| `get_gas_advice` | ~$0.003 | Send now or wait: `send_now` or `wait` with a confidence level, the reason, minutes to wait, the USD cost now and ready-to-sign `maxFeePerGas` / `maxPriorityFeePerGas` (wei). Optional `gasLimit`. |
 | `compare_gas_costs` | ~$0.01 | The same transaction on Base, OP Mainnet, Arbitrum One and Ethereum, in USD, cheapest first. Optional `gasLimit`. |
 | `get_gas_history` | ~$0.01 | Base gas over the last `hours` (default 24): min/max/average/median and whether gas is cheap, normal, expensive or flat now. |
 | `get_cheapest_window` | ~$0.02 | From 7 days of history: hours to avoid, cheapest hour (UTC), and the saving in percent and USD. |
@@ -133,6 +134,7 @@ The server reads its settings only from the environment the client passes. It do
 Once configured, ask your agent:
 
 - "What does a Uniswap swap on Base cost right now, in dollars?" (`get_base_gas` with `gasLimit` 180000)
+- "Should I send this swap on Base now or wait?" (`get_gas_advice` with `gasLimit` 180000)
 - "Is Base or Arbitrum cheaper for a token transfer at the moment?" (`compare_gas_costs`)
 - "Is Base gas high right now, or should I wait?" (`get_gas_history`)
 - "When should I schedule a batch of transactions on Base?" (`get_cheapest_window`)

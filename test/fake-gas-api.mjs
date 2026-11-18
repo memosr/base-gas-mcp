@@ -3,7 +3,7 @@ import http from "node:http";
 // A stand-in for the base-gas-x402 API. Paid routes answer an unpaid request
 // with a real-shaped x402 v2 challenge and a paid one with data plus a receipt.
 // The payment itself is not verified: these tests cover the client side.
-export const PRICES = { "/gas": "2000", "/gas/compare": "10000", "/gas/history": "10000", "/gas/cheapest-window": "20000" };
+export const PRICES = { "/gas": "2000", "/gas/compare": "10000", "/gas/history": "10000", "/gas/cheapest-window": "20000", "/gas/advice": "3000" };
 
 const BODIES = {
   "/gas": {
@@ -22,9 +22,22 @@ const BODIES = {
   },
   "/gas/history": { requestedHours: 24, verdict: "cheap", verdictNote: "Current price sits at 0% of the window's range." },
   "/gas/cheapest-window": { recommendation: "Avoid 02:00 UTC. The cheapest hour is 04:00 UTC." },
+  "/gas/advice": {
+    advice: "send_now",
+    confidence: "high",
+    reason: "Base gas is in the bottom third of its 24h range.",
+    waitMinutes: null,
+    now: { costUsd: "0.0035", gasLimit: 180000, baseFeePerGas: "0.01", priorityFeePerGas: { medium: "0.006038644" } },
+    verdict: "cheap",
+    verdictNote: "Current price sits at 12% of the window's range.",
+    suggestedFees: { maxFeePerGas: "16038644", maxPriorityFeePerGas: "6038644" },
+    fetchedAt: "2026-11-18T12:00:00.000Z",
+  },
 };
 
-export async function startFakeApi({ prices = PRICES } = {}) {
+// `bodies` overrides the default response of individual routes.
+export async function startFakeApi({ prices = PRICES, bodies = {} } = {}) {
+  const responses = { ...BODIES, ...bodies };
   const seen = [];
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, "http://x");
@@ -57,7 +70,7 @@ export async function startFakeApi({ prices = PRICES } = {}) {
     }
     const receipt = { success: true, transaction: "0xabc123", network: "eip155:8453", payer: "0x0" };
     res.setHeader("payment-response", Buffer.from(JSON.stringify(receipt)).toString("base64"));
-    res.end(JSON.stringify(BODIES[url.pathname]));
+    res.end(JSON.stringify(responses[url.pathname]));
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   return { origin: `http://127.0.0.1:${server.address().port}`, seen, close: () => server.close() };
